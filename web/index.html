@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>NeuroPet</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+      color: #e6edf3;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .container { max-width: 480px; margin: 0 auto; padding: 16px; }
+
+    header { text-align: center; margin-bottom: 16px; }
+    h1 {
+      font-size: 1.8em;
+      background: linear-gradient(90deg, #58a6ff, #a371f7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    h1:hover { opacity: 0.7; }
+    .status-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #484f58;
+      margin-right: 6px;
+      transition: all 0.3s;
+    }
+    .status-dot.on { background: #3fb950; box-shadow: 0 0 8px #3fb950; }
+    .status-bar {
+      font-size: 0.75em;
+      color: #8b949e;
+      margin-top: 8px;
+    }
+
+    .pet-section {
+      background: rgba(22, 27, 34, 0.9);
+      border: 1px solid #30363d;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    #pet-canvas {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      border-radius: 12px;
+      background: #0d1117;
+    }
+    .action-label {
+      font-size: 1.3em;
+      margin-top: 12px;
+      font-weight: 600;
+    }
+
+    .led-display {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin-bottom: 16px;
+    }
+    .led-item { text-align: center; }
+    .led-circle {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      margin: 0 auto 8px;
+      box-shadow: 0 0 20px currentColor;
+      transition: all 0.3s;
+    }
+    .led-label { font-size: 0.7em; color: #8b949e; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .stat-card {
+      background: rgba(22, 27, 34, 0.9);
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .stat-label { font-size: 0.7em; color: #8b949e; margin-bottom: 6px; }
+    .stat-bar { height: 6px; background: #21262d; border-radius: 3px; overflow: hidden; }
+    .stat-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
+    .stat-val { font-size: 0.85em; text-align: right; margin-top: 6px; font-weight: 500; }
+
+    .time-section {
+      background: rgba(22, 27, 34, 0.9);
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .time-label { font-size: 0.7em; color: #8b949e; margin-bottom: 6px; }
+    .time-display { font-size: 1.6em; font-weight: 600; }
+    .night-badge {
+      display: none;
+      background: #6e40c9;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 0.7em;
+      margin-left: 10px;
+      vertical-align: middle;
+    }
+    .time-controls { margin-top: 10px; }
+    .time-input {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #e6edf3;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 0.9em;
+    }
+    .btn {
+      border: none;
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85em;
+      margin-left: 6px;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: #238636; }
+    .btn-secondary { background: #1f6feb; }
+    .btn-muted { background: #484f58; }
+
+    .name-edit {
+      display: none;
+      margin-top: 8px;
+    }
+    .name-input {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #e6edf3;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 1.1em;
+      width: 160px;
+      text-align: center;
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1 id="pet-name" onclick="showNameEdit()">NeuroPet</h1>
+    <div id="name-edit" class="name-edit">
+      <input type="text" id="name-input" class="name-input" maxlength="24">
+      <button onclick="saveName()" class="btn btn-primary" data-i18n="save">Save</button>
+      <button onclick="hideNameEdit()" class="btn btn-muted" data-i18n="cancel">Cancel</button>
+    </div>
+    <div class="status-bar">
+      <span class="status-dot" id="ws-dot"></span>
+      <span id="ws-status" data-i18n="connecting">Connecting...</span>
+    </div>
+  </header>
+
+  <div class="pet-section">
+    <canvas id="pet-canvas" width="280" height="200"></canvas>
+    <div class="action-label" id="action-label">...</div>
+  </div>
+
+  <div class="led-display">
+    <div class="led-item">
+      <div class="led-circle" id="led-hunger"></div>
+      <div class="led-label" data-i18n="hunger">Hunger</div>
+    </div>
+    <div class="led-item">
+      <div class="led-circle" id="led-mood"></div>
+      <div class="led-label" data-i18n="mood">Mood</div>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label" data-i18n="hunger">Hunger</div>
+      <div class="stat-bar"><div class="stat-fill" id="hunger-bar"></div></div>
+      <div class="stat-val" id="hunger-val">0%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label" data-i18n="energy">Energy</div>
+      <div class="stat-bar"><div class="stat-fill" id="energy-bar"></div></div>
+      <div class="stat-val" id="energy-val">0%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label" data-i18n="affection">Affection</div>
+      <div class="stat-bar"><div class="stat-fill" id="affection-bar"></div></div>
+      <div class="stat-val" id="affection-val">0%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label" data-i18n="trust">Trust</div>
+      <div class="stat-bar"><div class="stat-fill" id="trust-bar"></div></div>
+      <div class="stat-val" id="trust-val">0%</div>
+    </div>
+  </div>
+
+  <div class="time-section">
+    <div class="time-label" data-i18n="petTime">Pet Time</div>
+    <div>
+      <span class="time-display" id="pet-time">--:--</span>
+      <span class="night-badge" id="night-badge" data-i18n="night">Night</span>
+    </div>
+    <div class="time-controls">
+      <input type="time" id="time-input" class="time-input">
+      <button onclick="setTime()" class="btn btn-primary" data-i18n="set">Set</button>
+      <button onclick="syncTime()" class="btn btn-secondary" data-i18n="sync">Sync</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const I18N = {
+  en: {
+    connecting: 'Connecting...',
+    connected: 'Connected',
+    reconnecting: 'Reconnecting...',
+    hunger: 'Hunger',
+    energy: 'Energy',
+    affection: 'Affection',
+    trust: 'Trust',
+    mood: 'Mood',
+    petTime: 'Pet Time',
+    night: 'Night',
+    set: 'Set',
+    sync: 'Sync',
+    save: 'Save',
+    cancel: 'Cancel',
+    actions: ['Sleeping', 'Chilling', 'Playing', 'Hungry!', 'Wants pets', 'Happy!', 'Grumpy', 'Sad']
+  },
+  ru: {
+    connecting: 'Подключение...',
+    connected: 'Подключено',
+    reconnecting: 'Переподключение...',
+    hunger: 'Голод',
+    energy: 'Энергия',
+    affection: 'Привязанность',
+    trust: 'Доверие',
+    mood: 'Настроение',
+    petTime: 'Время питомца',
+    night: 'Ночь',
+    set: 'Установить',
+    sync: 'Синхр.',
+    save: 'Сохранить',
+    cancel: 'Отмена',
+    actions: ['Спит', 'Отдыхает', 'Играет', 'Голоден!', 'Хочет ласки', 'Счастлив!', 'Раздражён', 'Грустит']
+  }
+};
+
+let lang = navigator.language.startsWith('ru') ? 'ru' : 'en';
+let t = I18N[lang];
+
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.dataset.i18n;
+    if (t[key]) el.textContent = t[key];
+  });
+}
+
+let petIdentity = null;
+let PAL = {
+  air: null,
+  body0: "#2d333b", body1: "#444c56", body2: "#636e7b",
+  belly: "#adbac7", belly2: "#cdd9e5",
+  nose: "#1c2128", tongue: "#f47067",
+  eye: "#ffffff", collar: "#6e40c9", ear: "#373e47"
+};
+
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+  const m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) { r = c; g = x; }
+  else if (h < 120) { r = x; g = c; }
+  else if (h < 180) { g = c; b = x; }
+  else if (h < 240) { g = x; b = c; }
+  else if (h < 300) { r = x; b = c; }
+  else { r = c; b = x; }
+  const hex = v => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+  return '#' + hex(r) + hex(g) + hex(b);
+}
+
+function updatePalette(h1, h2) {
+  const hue1 = (h1 / 255) * 360;
+  const hue2 = (h2 / 255) * 360;
+  PAL.body0 = hslToHex(hue1, 30, 22);
+  PAL.body1 = hslToHex(hue1, 25, 32);
+  PAL.body2 = hslToHex(hue1, 20, 45);
+  PAL.ear = hslToHex(hue1, 20, 26);
+  PAL.collar = hslToHex(hue2, 60, 52);
+  rebuildModels();
+}
+
+const canvas = document.getElementById("pet-canvas");
+const ctx = canvas.getContext("2d");
+ctx.imageSmoothingEnabled = false;
+const S = 4, TW = 2 * S, TH = S;
+
+function clear() { ctx.fillStyle = "#0d1117"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+
+function iso(x, y, z, ox, oy) {
+  return [(x - y) * TW + ox, (x + y) * TH - z * 2 * S + oy];
+}
+
+function shade(c, f) {
+  const m = { [PAL.body0]: [PAL.body0, PAL.body1, PAL.body2], [PAL.body1]: [PAL.body0, PAL.body1, PAL.body2], [PAL.body2]: [PAL.body1, PAL.body2, PAL.body2], [PAL.belly]: [PAL.belly, PAL.belly2, PAL.belly2] };
+  const t = m[c] || [c, c, c];
+  return f < 0.95 ? t[0] : f > 1.05 ? t[2] : t[1];
+}
+
+function drawVox(x, y, z, c, ox, oy) {
+  const [sx, sy] = iso(x, y, z, ox, oy);
+  ctx.fillStyle = shade(c, 1.15);
+  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + TW, sy + TH); ctx.lineTo(sx, sy + 2 * TH); ctx.lineTo(sx - TW, sy + TH); ctx.fill();
+  ctx.fillStyle = shade(c, 0.9);
+  ctx.beginPath(); ctx.moveTo(sx - TW, sy + TH); ctx.lineTo(sx, sy + 2 * TH); ctx.lineTo(sx, sy + 2 * TH + 2 * S); ctx.lineTo(sx - TW, sy + TH + 2 * S); ctx.fill();
+  ctx.fillStyle = shade(c, 1);
+  ctx.beginPath(); ctx.moveTo(sx + TW, sy + TH); ctx.lineTo(sx, sy + 2 * TH); ctx.lineTo(sx, sy + 2 * TH + 2 * S); ctx.lineTo(sx + TW, sy + TH + 2 * S); ctx.fill();
+}
+
+class VM {
+  constructor(w, d, h) { this.w = w; this.d = d; this.h = h; this.data = new Array(w * d * h).fill(null); }
+  i(x, y, z) { return x + this.w * (y + this.d * z); }
+  ok(x, y, z) { return x >= 0 && y >= 0 && z >= 0 && x < this.w && y < this.d && z < this.h; }
+  set(x, y, z, c) { if (this.ok(x, y, z)) this.data[this.i(x, y, z)] = c; }
+  get(x, y, z) { return this.ok(x, y, z) ? this.data[this.i(x, y, z)] : null; }
+  box(x0, y0, z0, x1, y1, z1, c) { for (let z = z0; z <= z1; z++) for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) this.set(x, y, z, c); }
+}
+
+function render(m, ox, oy) {
+  const v = [];
+  for (let z = 0; z < m.h; z++) for (let y = 0; y < m.d; y++) for (let x = 0; x < m.w; x++) {
+    const c = m.get(x, y, z);
+    if (!c) continue;
+    if (m.get(x+1,y,z) && m.get(x-1,y,z) && m.get(x,y+1,z) && m.get(x,y-1,z) && m.get(x,y,z+1) && m.get(x,y,z-1)) continue;
+    v.push({x: m.w - 1 - x, y, z, c});
+  }
+  v.sort((a, b) => (a.x + a.y + a.z) - (b.x + b.y + b.z));
+  for (const p of v) drawVox(p.x, p.y, p.z, p.c, ox, oy);
+}
+
+function bIdle() {
+  const m = new VM(16, 10, 12);
+  m.box(4,3,2,11,6,6,PAL.body1); m.box(5,4,6,10,5,7,PAL.body2); m.box(5,3,2,10,3,5,PAL.belly);
+  m.box(1,3,5,4,6,9,PAL.body1); m.box(2,4,9,3,5,10,PAL.body2);
+  m.box(0,4,6,1,5,7,PAL.belly); m.box(0,4,7,0,5,7,PAL.nose);
+  m.box(1,3,8,1,3,8,PAL.eye); m.box(1,6,8,1,6,8,PAL.eye);
+  m.box(2,2,9,2,2,11,PAL.ear); m.box(3,7,9,3,7,11,PAL.ear);
+  m.box(9,2,0,10,3,2,PAL.body0); m.box(9,6,0,10,7,2,PAL.body0); m.box(5,2,0,6,3,2,PAL.body0); m.box(5,6,0,6,7,2,PAL.body0);
+  m.box(12,4,5,14,5,6,PAL.body0); m.box(14,4,6,15,5,7,PAL.body0);
+  m.box(3,4,5,5,5,5,PAL.collar);
+  return m;
+}
+
+function bSleep() {
+  const m = new VM(16, 10, 8);
+  m.box(4,2,1,12,7,4,PAL.body1); m.box(5,3,4,11,6,5,PAL.body2);
+  m.box(2,3,2,5,6,5,PAL.body1); m.box(3,4,5,4,5,6,PAL.body2);
+  m.box(2,3,4,2,3,4,PAL.body0); m.box(2,6,4,2,6,4,PAL.body0);
+  m.box(1,4,3,1,5,3,PAL.nose);
+  m.box(11,3,2,13,4,3,PAL.body0); m.box(13,4,3,14,5,4,PAL.body0);
+  m.box(6,2,1,10,2,3,PAL.belly);
+  return m;
+}
+
+function bPlay() {
+  const m = new VM(16, 10, 14);
+  m.box(4,3,5,11,6,9,PAL.body1); m.box(5,4,9,10,5,10,PAL.body2);
+  m.box(1,3,8,4,6,12,PAL.body1); m.box(2,4,12,3,5,13,PAL.body2);
+  m.box(0,4,9,1,5,10,PAL.belly); m.box(0,4,9,0,5,9,PAL.tongue); m.box(0,4,11,0,5,11,PAL.nose);
+  m.box(1,3,11,1,3,11,PAL.eye); m.box(1,6,11,1,6,11,PAL.eye);
+  m.box(2,2,12,2,2,14,PAL.ear); m.box(3,7,12,3,7,14,PAL.ear);
+  m.box(9,2,3,10,3,5,PAL.body0); m.box(9,6,3,10,7,5,PAL.body0); m.box(5,2,2,6,3,5,PAL.body0); m.box(5,6,2,6,7,5,PAL.body0);
+  m.box(12,4,8,14,5,10,PAL.body0); m.box(14,3,10,15,6,12,PAL.body0);
+  m.box(3,4,8,5,5,8,PAL.collar);
+  return m;
+}
+
+function bFood() {
+  const m = new VM(16, 10, 12);
+  m.box(5,3,2,11,6,6,PAL.body1);
+  m.box(2,3,6,5,6,10,PAL.body1); m.box(3,4,10,4,5,11,PAL.body2);
+  m.box(1,4,7,2,5,8,PAL.belly); m.box(0,4,6,0,5,7,PAL.tongue); m.box(1,4,9,1,5,9,PAL.nose);
+  m.box(2,3,9,2,3,9,PAL.eye); m.box(2,6,9,2,6,9,PAL.eye);
+  m.box(3,2,8,3,2,10,PAL.ear); m.box(4,7,8,4,7,10,PAL.ear);
+  m.box(8,3,3,9,4,6,PAL.body0); m.box(8,5,3,9,6,6,PAL.body0);
+  m.box(6,2,0,8,3,2,PAL.body0); m.box(6,6,0,8,7,2,PAL.body0);
+  m.box(11,4,3,13,5,4,PAL.body0);
+  m.box(6,3,2,10,3,4,PAL.belly);
+  return m;
+}
+
+function bPet() {
+  const m = new VM(16, 10, 12);
+  m.box(4,3,2,11,6,6,PAL.body1);
+  m.box(1,2,5,4,5,9,PAL.body1); m.box(2,3,9,3,4,10,PAL.body2);
+  m.box(0,3,6,1,4,7,PAL.belly); m.box(0,3,7,0,4,7,PAL.nose);
+  m.box(1,2,8,1,2,8,PAL.eye); m.box(1,5,8,1,5,8,PAL.eye);
+  m.box(2,1,8,2,1,11,PAL.ear); m.box(3,6,7,3,6,9,PAL.ear);
+  m.box(9,2,0,10,3,2,PAL.body0); m.box(9,6,0,10,7,2,PAL.body0); m.box(5,2,0,6,3,2,PAL.body0); m.box(5,6,0,6,7,2,PAL.body0);
+  m.box(12,4,4,14,5,6,PAL.body0); m.box(14,5,6,15,6,8,PAL.body0);
+  m.box(3,3,5,5,4,5,PAL.collar);
+  m.box(5,3,2,10,3,5,PAL.belly);
+  return m;
+}
+
+function bHappy() {
+  const m = new VM(16, 10, 14);
+  m.box(4,3,4,11,6,8,PAL.body1); m.box(5,4,8,10,5,9,PAL.body2);
+  m.box(1,3,7,4,6,11,PAL.body1); m.box(2,4,11,3,5,12,PAL.body2);
+  m.box(0,4,8,1,5,9,PAL.belly); m.box(0,4,8,0,5,8,PAL.tongue); m.box(0,4,10,0,5,10,PAL.nose);
+  m.box(1,3,10,1,3,10,PAL.body0); m.box(1,6,10,1,6,10,PAL.body0);
+  m.box(2,2,10,2,2,13,PAL.ear); m.box(3,7,10,3,7,13,PAL.ear);
+  m.box(9,2,2,10,3,4,PAL.body0); m.box(9,6,1,10,7,4,PAL.body0); m.box(5,2,1,6,3,4,PAL.body0); m.box(5,6,2,6,7,4,PAL.body0);
+  m.box(12,4,7,14,5,9,PAL.body0); m.box(14,4,9,15,5,12,PAL.body0);
+  m.box(3,4,7,5,5,7,PAL.collar);
+  return m;
+}
+
+function bAnnoyed() {
+  const m = new VM(16, 10, 11);
+  m.box(4,3,2,11,6,6,PAL.body1);
+  m.box(1,3,4,4,6,8,PAL.body1); m.box(2,4,8,3,5,9,PAL.body2);
+  m.box(0,4,5,1,5,6,PAL.belly); m.box(0,4,7,0,5,7,PAL.nose);
+  m.box(1,3,7,1,3,7,PAL.eye); m.box(1,6,7,1,6,7,PAL.eye);
+  m.box(1,3,8,1,3,8,PAL.body0); m.box(1,6,8,1,6,8,PAL.body0);
+  m.box(2,2,7,2,2,8,PAL.ear); m.box(3,7,7,3,7,8,PAL.ear);
+  m.box(9,2,0,10,3,2,PAL.body0); m.box(9,6,0,10,7,2,PAL.body0); m.box(5,2,0,6,3,2,PAL.body0); m.box(5,6,0,6,7,2,PAL.body0);
+  m.box(12,4,3,14,5,4,PAL.body0); m.box(14,4,2,15,5,3,PAL.body0);
+  m.box(3,4,4,5,5,4,PAL.collar);
+  return m;
+}
+
+function bSad() {
+  const m = new VM(16, 10, 10);
+  m.box(4,3,1,11,6,5,PAL.body1);
+  m.box(1,3,3,4,6,7,PAL.body1); m.box(2,4,7,3,5,8,PAL.body2);
+  m.box(0,4,4,1,5,5,PAL.belly); m.box(0,4,6,0,5,6,PAL.nose);
+  m.box(1,3,6,1,3,6,PAL.eye); m.box(1,6,6,1,6,6,PAL.eye);
+  m.box(2,2,5,2,2,6,PAL.ear); m.box(2,1,4,2,1,5,PAL.ear); m.box(3,7,5,3,7,6,PAL.ear); m.box(3,8,4,3,8,5,PAL.ear);
+  m.box(9,2,0,10,3,1,PAL.body0); m.box(9,6,0,10,7,1,PAL.body0); m.box(5,2,0,6,3,1,PAL.body0); m.box(5,6,0,6,7,1,PAL.body0);
+  m.box(10,4,0,11,5,2,PAL.body0);
+  m.box(3,4,3,5,5,3,PAL.collar);
+  return m;
+}
+
+let MODELS = {};
+function rebuildModels() {
+  MODELS = { 0: bSleep(), 1: bIdle(), 2: bPlay(), 3: bFood(), 4: bPet(), 5: bHappy(), 6: bAnnoyed(), 7: bSad() };
+}
+rebuildModels();
+
+let curAction = 1;
+
+function renderPet() {
+  clear();
+  const m = MODELS[curAction] || MODELS[1];
+  let yOff = 0;
+  const now = Date.now();
+  switch(curAction) {
+    case 0: yOff = Math.sin(now * 0.002) * 2; break;
+    case 2: yOff = Math.abs(Math.sin(now * 0.008)) * -10; break;
+    case 3: yOff = Math.sin(now * 0.005) * 3; break;
+    case 4: yOff = Math.sin(now * 0.004) * 2; break;
+    case 5: yOff = Math.abs(Math.sin(now * 0.01)) * -6; break;
+    case 6: yOff = Math.sin(now * 0.02) * 1; break;
+    case 7: yOff = Math.sin(now * 0.002) * 1 + 2; break;
+  }
+  render(m, canvas.width / 2, canvas.height / 2 + m.h * S / 2 + yOff);
+  requestAnimationFrame(renderPet);
+}
+
+let ws, wsRetry = 0, wsHB = null, wsLast = 0;
+
+function connect() {
+  if (ws && ws.readyState === WebSocket.OPEN) return;
+  try { ws = new WebSocket('ws://' + location.hostname + ':81'); } catch(e) { reconnect(); return; }
+  ws.onopen = () => {
+    wsRetry = 0; wsLast = Date.now();
+    document.getElementById('ws-dot').classList.add('on');
+    document.getElementById('ws-status').textContent = t.connected;
+    startHB();
+  };
+  ws.onclose = () => {
+    document.getElementById('ws-dot').classList.remove('on');
+    document.getElementById('ws-status').textContent = t.reconnecting;
+    stopHB(); reconnect();
+  };
+  ws.onerror = () => ws.close();
+  ws.onmessage = (e) => { wsLast = Date.now(); try { handle(JSON.parse(e.data)); } catch(er) {} };
+}
+
+function reconnect() { wsRetry++; setTimeout(connect, Math.min(1000 * wsRetry, 5000)); }
+function startHB() { stopHB(); wsHB = setInterval(() => { if (Date.now() - wsLast > 10000) ws.close(); }, 5000); }
+function stopHB() { if (wsHB) { clearInterval(wsHB); wsHB = null; } }
+
+function handle(d) {
+  if (d.type === 'state_update') {
+    if (d.state) {
+      setStat('hunger', d.state.hunger);
+      setStat('energy', d.state.energy);
+      setStat('affection', d.state.affection);
+      setStat('trust', d.state.trust);
+    }
+    if (d.brain) {
+      document.getElementById('action-label').textContent = t.actions[d.brain.action_id] || '?';
+      curAction = d.brain.action_id;
+      updateLEDs(d.state?.hunger || 0, d.brain.valence);
+    }
+  }
+  if (d.type === 'pet_renamed') {
+    document.getElementById('pet-name').textContent = d.name;
+    document.title = d.name;
+    if (petIdentity) petIdentity.name = d.name;
+  }
+}
+
+function setStat(n, v) {
+  const p = (v * 100) | 0;
+  const bar = document.getElementById(n + '-bar');
+  const val = document.getElementById(n + '-val');
+  if (bar) bar.style.width = p + '%';
+  if (val) val.textContent = p + '%';
+  let c = '#3fb950';
+  if (n === 'hunger') c = v > 0.6 ? '#f85149' : v > 0.3 ? '#d29922' : '#3fb950';
+  else if (n === 'energy') c = v < 0.3 ? '#f85149' : v < 0.5 ? '#d29922' : '#3fb950';
+  else if (n === 'trust') c = v > 0.6 ? '#58a6ff' : v > 0.3 ? '#d29922' : '#f85149';
+  else if (n === 'affection') c = v > 0.6 ? '#a371f7' : v > 0.3 ? '#8b949e' : '#484f58';
+  if (bar) bar.style.background = c;
+}
+
+function updateLEDs(hunger, valence) {
+  const h1 = 240 - hunger * 240;
+  const led1 = document.getElementById('led-hunger');
+  led1.style.background = `hsl(${h1}, 85%, 55%)`;
+  led1.style.boxShadow = `0 0 20px hsl(${h1}, 85%, 55%)`;
+  const norm = (valence + 1) / 2;
+  const h2 = 280 - norm * 160;
+  const led2 = document.getElementById('led-mood');
+  led2.style.background = `hsl(${h2}, 80%, 55%)`;
+  led2.style.boxShadow = `0 0 20px hsl(${h2}, 80%, 55%)`;
+}
+
+async function fetchTime() {
+  try {
+    const r = await fetch('/api/time');
+    const d = await r.json();
+    document.getElementById('pet-time').textContent = String(d.hour).padStart(2,'0') + ':' + String(d.minute).padStart(2,'0');
+    document.getElementById('night-badge').style.display = d.is_night ? 'inline' : 'none';
+  } catch(e) {}
+}
+
+async function setTime() {
+  const v = document.getElementById('time-input').value;
+  if (!v) return;
+  const [h, m] = v.split(':').map(Number);
+  try { await fetch('/api/time', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({hour: h, minute: m}) }); fetchTime(); } catch(e) {}
+}
+
+function syncTime() {
+  const now = new Date();
+  document.getElementById('time-input').value = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  setTime();
+}
+
+async function fetchPet() {
+  try {
+    const r = await fetch('/api/pet');
+    petIdentity = await r.json();
+    document.getElementById('pet-name').textContent = petIdentity.name;
+    document.title = petIdentity.name;
+    if (petIdentity.colors?.primary) updatePalette(petIdentity.colors.primary.hue, petIdentity.colors.secondary.hue);
+  } catch(e) {}
+}
+
+function showNameEdit() {
+  document.getElementById('pet-name').style.display = 'none';
+  document.getElementById('name-edit').style.display = 'block';
+  const inp = document.getElementById('name-input');
+  inp.value = petIdentity?.name || '';
+  inp.focus(); inp.select();
+}
+
+function hideNameEdit() {
+  document.getElementById('name-edit').style.display = 'none';
+  document.getElementById('pet-name').style.display = 'block';
+}
+
+async function saveName() {
+  const name = document.getElementById('name-input').value.trim();
+  if (!name || name.length > 24) return;
+  try {
+    const r = await fetch('/api/pet/name', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name}) });
+    if (r.ok) {
+      document.getElementById('pet-name').textContent = name;
+      document.title = name;
+      if (petIdentity) petIdentity.name = name;
+      hideNameEdit();
+    }
+  } catch(e) {}
+}
+
+document.getElementById('name-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') saveName();
+  if (e.key === 'Escape') hideNameEdit();
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && (!ws || ws.readyState !== WebSocket.OPEN)) { connect(); fetchPet(); }
+});
+
+setInterval(fetchTime, 30000);
+applyI18n();
+connect();
+renderPet();
+fetchTime();
+fetchPet();
+</script>
+</body>
+</html>
